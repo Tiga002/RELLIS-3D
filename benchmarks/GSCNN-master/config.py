@@ -63,7 +63,7 @@ __C.STRICTBORDERCLASS= None
 
 __C.DATASET =AttrDict()
 __C.DATASET.CITYSCAPES_DIR='/home/usl/Datasets/cityscapes/'
-__C.DATASET.RELLIS_DIR='/path/to/RELLIS-3D/'
+__C.DATASET.RELLIS_DIR='/home/tiga/Documents/IRP/RELLIS-3D/dataset/Rellis-3D/'
 __C.DATASET.CV_SPLITS=3
 
 __C.MODEL = AttrDict()

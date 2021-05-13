@@ -33,12 +33,12 @@ class GatedSpatialConv2d(_ConvNd):
         dilation = _pair(dilation)
         super(GatedSpatialConv2d, self).__init__(
             in_channels, out_channels, kernel_size, stride, padding, dilation,
-            False, _pair(0), groups, bias)
+            False, _pair(0), groups, bias, 'zeros')
 
         self._gate_conv = nn.Sequential(
             mynn.Norm2d(in_channels+1),
             nn.Conv2d(in_channels+1, in_channels+1, 1),
-            nn.ReLU(), 
+            nn.ReLU(),
             nn.Conv2d(in_channels+1, 1, 1),
             mynn.Norm2d(1),
             nn.Sigmoid()
@@ -53,10 +53,10 @@ class GatedSpatialConv2d(_ConvNd):
         """
         alphas = self._gate_conv(torch.cat([input_features, gating_features], dim=1))
 
-        input_features = (input_features * (alphas + 1)) 
+        input_features = (input_features * (alphas + 1))
         return F.conv2d(input_features, self.weight, self.bias, self.stride,
                         self.padding, self.dilation, self.groups)
-  
+
     def reset_parameters(self):
         nn.init.xavier_normal_(self.weight)
         if self.bias is not None:
@@ -93,7 +93,7 @@ class HighFrequencyGatedSpatialConv2d(_ConvNd):
         self._gate_conv = nn.Sequential(
             mynn.Norm2d(in_channels+1),
             nn.Conv2d(in_channels+1, in_channels+1, 1),
-            nn.ReLU(), 
+            nn.ReLU(),
             nn.Conv2d(in_channels+1, 1, 1),
             mynn.Norm2d(1),
             nn.Sigmoid()
@@ -127,7 +127,7 @@ class HighFrequencyGatedSpatialConv2d(_ConvNd):
         self.gaussian_filter.weight.requires_grad = False
 
         self.cw = nn.Conv2d(in_channels * 2, in_channels, 1)
- 
+
         self.procdog = nn.Sequential(
             nn.Conv2d(in_channels, in_channels, 1),
             mynn.Norm2d(in_channels),
@@ -145,7 +145,7 @@ class HighFrequencyGatedSpatialConv2d(_ConvNd):
         smooth_features = self.gaussian_filter(input_features)
         dog_features = input_features - smooth_features
         dog_features = self.cw(torch.cat((dog_features, input_features), dim=1))
-        
+
         alphas = self._gate_conv(torch.cat([input_features, gating_features], dim=1))
 
         dog_features = dog_features * (alphas + 1)
@@ -176,6 +176,6 @@ def t():
     print('done')
 
 
+
 if __name__ == "__main__":
     t()
-

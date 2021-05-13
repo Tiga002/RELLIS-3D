@@ -46,7 +46,7 @@ class Rellis(data.Dataset):
 
     def __init__(self, mode, joint_transform=None, sliding_crop=None,
                  transform=None, target_transform=None, dump_images=False,
-                 cv_split=None, eval_mode=False, 
+                 cv_split=None, eval_mode=False,
                  eval_scales=None, eval_flip=False):
         self.mode = mode
         self.joint_transform = joint_transform
@@ -99,14 +99,14 @@ class Rellis(data.Dataset):
                 img = img.transpose(Image.FLIP_LEFT_RIGHT)
             for scale in scales:
                 w,h = img.size
-                target_w, target_h = int(w * scale), int(h * scale) 
+                target_w, target_h = int(w * scale), int(h * scale)
                 resize_img =img.resize((target_w, target_h))
                 tensor_img = transforms.ToTensor()(resize_img)
                 final_tensor = transforms.Normalize(*self.mean_std)(tensor_img)
                 imgs.append(tensor_img)
             return_imgs.append(imgs)
         return return_imgs, mask
-        
+
     def read_files(self):
         files = []
         # if 'test' in self.mode:
@@ -130,7 +130,7 @@ class Rellis(data.Dataset):
         return files
 
     def convert_label(self, label, inverse=False):
-        
+
         temp = label.copy()
         if inverse:
             for v, k in self.label_mapping.items():
@@ -145,12 +145,11 @@ class Rellis(data.Dataset):
         img_name = item["name"]
         img_path = self.root + item['img']
         label_path = self.root + item["label"]
-
         img = Image.open(img_path).convert('RGB')
 
         mask = np.array(Image.open(label_path))
         mask = mask[:, :]
-        
+
 
         mask_copy = self.convert_label(mask)
 
@@ -175,7 +174,7 @@ class Rellis(data.Dataset):
         _edgemap = edge_utils.onehot_to_binary_edges(_edgemap, 2, num_classes)
 
         edgemap = torch.from_numpy(_edgemap).float()
-        
+
 	# Debug
         if self.dump_images:
             outdir = '../../dump_imgs_{}'.format(self.mode)
@@ -224,4 +223,3 @@ class CityScapesVideo(data.Dataset):
 
     def __len__(self):
         return len(self.imgs)
-

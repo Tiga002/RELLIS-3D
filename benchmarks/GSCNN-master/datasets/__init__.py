@@ -50,7 +50,7 @@ def setup_loaders(args):
                                            ignore_index=args.dataset_cls.ignore_label),
         joint_transforms.Resize(args.crop_size),
         joint_transforms.RandomHorizontallyFlip()]
- 
+
     #if args.rotate:
     #    train_joint_transform_list += [joint_transforms.RandomRotate(args.rotate)]
 
@@ -76,34 +76,37 @@ def setup_loaders(args):
                               standard_transforms.Normalize(*mean_std)]
     train_input_transform = standard_transforms.Compose(train_input_transform)
 
+    # Resize the testing image and mask as well
+    val_input_joint_transform = [joint_transforms.Resize(args.crop_size)]
+    val_input_joint_transform = joint_transforms.Compose(val_input_joint_transform)
+
     val_input_transform = standard_transforms.Compose([
         standard_transforms.ToTensor(),
         standard_transforms.Normalize(*mean_std)
     ])
 
     target_transform = extended_transforms.MaskToTensor()
-    
     target_train_transform = extended_transforms.MaskToTensor()
 
     if args.dataset == 'cityscapes':
         city_mode = 'train' ## Can be trainval
         city_quality = 'fine'
         train_set = args.dataset_cls.CityScapes(
-            city_quality, city_mode, 0, 
+            city_quality, city_mode, 0,
             joint_transform=train_joint_transform,
             transform=train_input_transform,
             target_transform=target_train_transform,
             dump_images=args.dump_augmentation_images,
             cv_split=args.cv)
-        val_set = args.dataset_cls.CityScapes('fine', 'val', 0, 
+        val_set = args.dataset_cls.CityScapes('fine', 'val', 0,
                                               transform=val_input_transform,
                                               target_transform=target_transform,
                                               cv_split=args.cv)
     elif args.dataset == 'rellis':
         if  args.mode != "test":
-            city_mode = 'train' 
+            city_mode = 'train'
             train_set = args.dataset_cls.Rellis(
-                city_mode, 
+                city_mode,
                 joint_transform=train_joint_transform,
                 transform=train_input_transform,
                 target_transform=target_train_transform,
@@ -114,18 +117,20 @@ def setup_loaders(args):
                                                 target_transform=target_transform,
                                                 cv_split=args.cv)
         else:
-            city_mode = 'test' 
+            city_mode = 'test'
             train_set = args.dataset_cls.Rellis('test',
+                                                joint_transform=val_input_joint_transform,
                                                 transform=val_input_transform,
                                                 target_transform=target_transform,
-                                                cv_split=args.cv)  
+                                                cv_split=args.cv)
             val_set = args.dataset_cls.Rellis('test',
+                                                joint_transform=val_input_joint_transform,
                                                 transform=val_input_transform,
                                                 target_transform=target_transform,
-                                                cv_split=args.cv)            
+                                                cv_split=args.cv)
     else:
         raise
-    
+
     train_sampler = None
     val_sampler = None
 
@@ -135,4 +140,3 @@ def setup_loaders(args):
                             num_workers=args.num_workers // 2 , shuffle=False, drop_last=False, sampler = val_sampler)
 
     return train_loader, val_loader,  train_set
-

@@ -24,6 +24,8 @@ import network
 import optimizer
 from tqdm import tqdm
 from PIL import Image
+from visualization import Colorize
+from torchvision.transforms import ToPILImage
 
 # Argument Parser
 parser = argparse.ArgumentParser(description='GSCNN')
@@ -72,14 +74,14 @@ parser.add_argument('--color_aug', type=float,
 parser.add_argument('--rotate', type=float,
                     default=0, help='rotation')
 parser.add_argument('--gblur', action='store_true', default=True)
-parser.add_argument('--bblur', action='store_true', default=False) 
+parser.add_argument('--bblur', action='store_true', default=False)
 parser.add_argument('--lr_schedule', type=str, default='poly',
                     help='name of lr schedule: poly')
 parser.add_argument('--poly_exp', type=float, default=1.0,
                     help='polynomial LR exponent')
 parser.add_argument('--bs_mult', type=int, default=1)
-parser.add_argument('--bs_mult_val', type=int, default=2)
-parser.add_argument('--crop_size', type=int, default=720,
+parser.add_argument('--bs_mult_val', type=int, default=0)
+parser.add_argument('--crop_size', type=int, default=256,
                     help='training crop size')
 parser.add_argument('--pre_size', type=int, default=None,
                     help='resize image shorter edge to this before augmentation')
@@ -103,7 +105,7 @@ parser.add_argument('--dump_augmentation_images', action='store_true', default=F
                     help='Synchronized BN')
 parser.add_argument('--test_mode', action='store_true', default=False,
                     help='minimum testing (1 epoch run ) to verify nothing failed')
-parser.add_argument('--mode',type=str,default="train")                    
+parser.add_argument('--mode',type=str,default="train")
 parser.add_argument('--test_sv_path', type=str, default="")
 parser.add_argument('--checkpoint_path',type=str,default="")
 parser.add_argument('-wb', '--wt_bound', type=float, default=1.0)
@@ -145,6 +147,8 @@ def main():
         net.eval()
         for vi, data in enumerate(tqdm(val_loader)):
             input, mask, img_name, img_path = data
+            #print('====== image size = {}'.format(input.shape))
+            #print('====== mask size = {}'.format(mask.shape))
             assert len(input.size()) == 4 and len(mask.size()) == 3
             assert input.size()[2:] == mask.size()[1:]
             b, h, w = mask.size()
@@ -157,13 +161,23 @@ def main():
 
             seg_predictions = seg_out.data.cpu().numpy()
             edge_predictions = edge_out.cpu().numpy()
+
+            ###
+            label = seg_out[0].max(0)[1].byte().cpu().data
+            label_color = Colorize()(label.unsqueeze(0))
+
             for i in range(b):
                 _,file_name = os.path.split(img_path[i])
                 file_name = file_name.replace("jpg","png")
                 seq = img_path[i][:5]
                 seg_path = os.path.join(test_sv_path,"gscnn","seg",seq)
+                color_label_path = seg_path = os.path.join(test_sv_path,"gscnn","color",seq)
                 if not os.path.exists(seg_path):
                     os.makedirs(seg_path)
+
+                if not os.path.exists(color_label_path):
+                    os.makedirs(color_label_path)
+
                 edge_path = os.path.join(test_sv_path,"gscnn","edge",seq)
                 edgenp_path = os.path.join(test_sv_path,"gscnn","edgenp",seq)
                 if not os.path.exists(edge_path):
@@ -176,6 +190,10 @@ def main():
                 edge_img = np.stack((edge_arg,edge_arg,edge_arg),axis=2)
                 seg_img = Image.fromarray(seg_img)
                 seg_img.save(os.path.join(seg_path,file_name))
+
+                label_save = ToPILImage()(label_color)
+                label_save.save(os.path.join(color_label_path,file_name))
+
                 edge_img = Image.fromarray(edge_img)
                 edge_img.save(os.path.join(edge_path,file_name))
                 np.save(os.path.join(edge_path,file_name.replace("png","npy")),edge_predictions[i])
@@ -213,7 +231,7 @@ def train(train_loader, net, criterion, optimizer, curr_epoch, writer):
     net: thet network
     criterion: loss fn
     optimizer: optimizer
-    curr_epoch: current epoch 
+    curr_epoch: current epoch
     writer: tensorboard writer
     return: val_avg for step function if required
     '''
@@ -249,7 +267,7 @@ def train(train_loader, net, criterion, optimizer, curr_epoch, writer):
 
         if args.joint_edgeseg_loss:
             loss_dict = net(inputs, gts=(mask, edge))
-            
+
             if args.seg_weight > 0:
                 log_seg_loss = loss_dict['seg_loss'].mean().clone().detach_()
                 train_seg_loss.update(log_seg_loss.item(), batch_pixel_size)
@@ -262,7 +280,7 @@ def train(train_loader, net, criterion, optimizer, curr_epoch, writer):
                     main_loss += loss_dict['edge_loss']
                 else:
                     main_loss = loss_dict['edge_loss']
-            
+
             if args.att_weight > 0:
                 log_att_loss = loss_dict['att_loss'].mean().clone().detach_()
                 train_att_loss.update(log_att_loss.item(), batch_pixel_size)
@@ -327,9 +345,9 @@ def validate(val_loader, net, criterion, optimizer, curr_epoch, writer):
     net: thet network
     criterion: loss fn
     optimizer: optimizer
-    curr_epoch: current epoch 
+    curr_epoch: current epoch
     writer: tensorboard writer
-    return: 
+    return:
     '''
     net.eval()
     val_loss = AverageMeter()
@@ -391,7 +409,7 @@ def evaluate(val_loader, net):
     Runs the evaluation loop and prints F score
     val_loader: Data loader for validation
     net: thet network
-    return: 
+    return:
     '''
     net.eval()
     for thresh in args.eval_thresholds.split(','):
@@ -427,9 +445,7 @@ def evaluate(val_loader, net):
         logging.info('F_Score: ' + str(np.sum(Fpc/Fc)/args.dataset_cls.num_classes))
         logging.info('F_Score (Classwise): ' + str(Fpc/Fc))
 
+
 if __name__ == '__main__':
+    torch.cuda.empty_cache()
     main()
-
-
-
-
